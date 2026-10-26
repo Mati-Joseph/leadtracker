@@ -5,4 +5,4 @@ __pycache__/
 instance/
 .env
 .pytest_cache/
-.vscode
+.vscodeke_schools.json
