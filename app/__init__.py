@@ -10,6 +10,8 @@ def create_app(config=None):
     if config:
         app.config.update(config)
     db.init_app(app)
+    from .routes import bp
+    app.register_blueprint(bp)
     with app.app_context():
         db.create_all()
     return app
