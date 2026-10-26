@@ -1,8 +1,14 @@
 """Fetch businesses from OpenStreetMap via the free Overpass API (no key, no billing)."""
+
+import os
 import re
+import time
+
 import requests
 
-URL = "https://overpass-api.de/api/interpreter"
+URL = os.environ.get("OVERPASS_URL", "https://overpass-api.de/api/interpreter")
+RETRY_CODES = {429, 502, 503, 504}
+DELAYS = (5, 15, 30)  # seconds to wait before each retry
 UA = "LeadTrackerBot/0.1 (contact research)"
 TAG_RE = re.compile(r"^[a-z_:]+=[a-z_:]+$")
 
@@ -17,12 +23,18 @@ def build_query(area, tag="amenity=driving_school"):
         pick = 'area["ISO3166-1"="KE"][admin_level=2]->.a;'
     else:
         pick = f'area["name"="{area}"]["boundary"="administrative"]->.a;'
-    return f'[out:json][timeout:60];{pick}nwr["{key}"="{value}"](area.a);out center tags;'
+    return (
+        f'[out:json][timeout:60];{pick}nwr["{key}"="{value}"](area.a);out center tags;'
+    )
 
 
 def _address(t):
-    parts = [t.get("addr:housenumber"), t.get("addr:street"),
-             t.get("addr:suburb"), t.get("addr:city") or t.get("addr:town")]
+    parts = [
+        t.get("addr:housenumber"),
+        t.get("addr:street"),
+        t.get("addr:suburb"),
+        t.get("addr:city") or t.get("addr:town"),
+    ]
     return ", ".join(p for p in parts if p)
 
 
@@ -32,20 +44,28 @@ def parse_elements(elements):
         t = e.get("tags", {})
         if not t.get("name"):
             continue
-        places.append({
-            "place_id": f"osm:{e['type']}/{e['id']}",
-            "name": t["name"],
-            "address": _address(t),
-            "phone": t.get("phone") or t.get("contact:phone", ""),
-            "website": t.get("website") or t.get("contact:website", ""),
-            "email": t.get("email") or t.get("contact:email", ""),
-        })
+        places.append(
+            {
+                "place_id": f"osm:{e['type']}/{e['id']}",
+                "name": t["name"],
+                "address": _address(t),
+                "phone": t.get("phone") or t.get("contact:phone", ""),
+                "website": t.get("website") or t.get("contact:website", ""),
+                "email": t.get("email") or t.get("contact:email", ""),
+            }
+        )
     return places
 
 
 def search_osm(area, tag="amenity=driving_school"):
-    r = requests.post(URL, data={"data": build_query(area, tag)},
-                      headers={"User-Agent": UA}, timeout=90)
+    query = build_query(area, tag)
+    for delay in (0,) + DELAYS:
+        time.sleep(delay)
+        r = requests.post(
+            URL, data={"data": query}, headers={"User-Agent": UA}, timeout=90
+        )
+        if r.status_code not in RETRY_CODES:
+            break
     if r.status_code != 200:
         raise RuntimeError(f"Overpass HTTP {r.status_code}: {r.text[:200]}")
     try:
