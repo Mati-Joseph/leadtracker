@@ -1,9 +1,18 @@
-from flask import Blueprint, current_app, jsonify, request, Response, send_from_directory
-from .models import db, Business, STATUSES
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    jsonify,
+    request,
+    send_from_directory,
+)
+
 from .collector import search_places
-from .grouping import save_places
+from .collector_osm import search_osm
 from .emails import find_email
 from .exporters import EXPORTERS
+from .grouping import save_places
+from .models import STATUSES, Business, db
 
 bp = Blueprint("api", __name__)
 
@@ -56,7 +65,10 @@ def collect():
     if not query:
         return jsonify(error="query required"), 400
     try:
-        places = search_places(query, current_app.config["GOOGLE_API_KEY"])
+        if current_app.config["LEAD_SOURCE"] == "google":
+            places = search_places(query, current_app.config["GOOGLE_API_KEY"])
+        else:
+            places = search_osm(query)
     except ValueError as e:
         return jsonify(error=str(e)), 400
     except Exception as e:
@@ -77,5 +89,8 @@ def export(fmt):
     if fmt not in EXPORTERS:
         return jsonify(error="use csv, xlsx or pdf"), 400
     func, mime = EXPORTERS[fmt]
-    return Response(func(_filtered()), mimetype=mime,
-                    headers={"Content-Disposition": f"attachment; filename=leads.{fmt}"})
+    return Response(
+        func(_filtered()),
+        mimetype=mime,
+        headers={"Content-Disposition": f"attachment; filename=leads.{fmt}"},
+    )

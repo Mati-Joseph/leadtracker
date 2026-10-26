@@ -63,6 +63,7 @@ def test_exports(app, client):
 
 
 def test_collect_without_key(app, client):
+    app.config["LEAD_SOURCE"] = "google"
     app.config["GOOGLE_API_KEY"] = ""
     assert (
         client.post(

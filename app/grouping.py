@@ -1,9 +1,13 @@
 """Save branches and group them into Business rows (key = website domain, else name)."""
+
 import re
 from urllib.parse import urlparse
-from .models import db, Branch, Business
 
-_SUFFIX = re.compile(r"\b(ltd|limited|school|schools|driving|branch|co|company)\b", re.I)
+from .models import Branch, Business, db
+
+_SUFFIX = re.compile(
+    r"\b(ltd|limited|school|schools|driving|branch|co|company)\b", re.I
+)
 
 
 def domain_of(url):
@@ -37,10 +41,17 @@ def save_places(places):
             db.session.add(biz)
         if not biz.support_phone and p.get("phone"):
             biz.support_phone = p["phone"]
-        biz.branches.append(Branch(
-            place_id=p["place_id"], name=p["name"], address=p.get("address"),
-            phone=p.get("phone"), website=p.get("website"),
-        ))
+        if not biz.email and p.get("email"):
+            biz.email = p["email"]
+        biz.branches.append(
+            Branch(
+                place_id=p["place_id"],
+                name=p["name"],
+                address=p.get("address"),
+                phone=p.get("phone"),
+                website=p.get("website"),
+            )
+        )
         added += 1
         db.session.flush()
     db.session.commit()
