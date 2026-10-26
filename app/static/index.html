@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lead Tracker</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:1.5rem;background:#111;color:#e6e6e6}
+input,select,button,textarea{background:#1c1c1c;color:#e6e6e6;border:1px solid #444;border-radius:4px;padding:.35rem .5rem}
+button{cursor:pointer}.bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center}
+table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #333;padding:.4rem;text-align:left;vertical-align:top;font-size:.9rem}
+a{color:#7cc4ff}#msg{margin-left:.5rem;color:#9f9}
+</style></head><body>
+<h2>Lead Tracker</h2>
+<div class="bar">
+  <input id="query" size="34" placeholder='e.g. driving school in Nairobi'>
+  <button id="collect">Collect</button><span id="msg"></span>
+</div>
+<div class="bar">
+  <input id="q" placeholder="search name">
+  <label>Min branches <input id="minb" type="number" min="1" value="2" style="width:4rem"></label>
+  <select id="status"><option value="">all statuses</option></select>
+  <button id="refresh">Apply</button>
+  Export: <a id="x-csv">CSV</a> <a id="x-xlsx">Excel</a> <a id="x-pdf">PDF</a>
+</div>
+<table><thead><tr><th>Name</th><th>Branches</th><th>Phone</th><th>Email</th><th>Status</th><th>Notes</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<script>
+const $ = id => document.getElementById(id);
+let STATUSES = [];
+const label = s => s.replace(/_/g, " ");
+const params = () => new URLSearchParams({q: $("q").value, min_branches: $("minb").value, status: $("status").value});
+const say = t => { $("msg").textContent = t; };
+
+async function api(url, opts) {
+  const r = await fetch(url, opts && {...opts, headers: {"Content-Type": "application/json"}});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function cell(tr, content) { const td = document.createElement("td"); td.append(content); tr.append(td); return td; }
+
+function render(list) {
+  const tbody = $("rows"); tbody.replaceChildren();
+  for (const b of list) {
+    const tr = document.createElement("tr");
+    const name = document.createElement("div"); name.textContent = b.name;
+    if (b.website) { const a = document.createElement("a"); a.href = b.website; a.target = "_blank"; a.rel = "noopener"; a.textContent = " ↗"; name.append(a); }
+    cell(tr, name).title = b.branches.join("\n");
+    cell(tr, String(b.branch_count));
+    cell(tr, b.support_phone || "");
+    const emailTd = cell(tr, b.email || "");
+    if (!b.email && b.website) {
+      const btn = document.createElement("button"); btn.textContent = "find";
+      btn.onclick = async () => { say("looking..."); try { await api(`/api/businesses/${b.id}/find-email`, {method: "POST"}); say(""); load(); } catch (e) { say(e.message); } };
+      emailTd.append(btn);
+    }
+    const sel = document.createElement("select");
+    for (const s of STATUSES) { const o = new Option(label(s), s, false, s === b.status); sel.append(o); }
+    sel.onchange = () => api(`/api/businesses/${b.id}`, {method: "PATCH", body: JSON.stringify({status: sel.value})}).catch(e => say(e.message));
+    cell(tr, sel);
+    const notes = document.createElement("textarea"); notes.rows = 1; notes.value = b.notes || "";
+    notes.onchange = () => api(`/api/businesses/${b.id}`, {method: "PATCH", body: JSON.stringify({notes: notes.value})}).catch(e => say(e.message));
+    cell(tr, notes);
+    tbody.append(tr);
+  }
+}
+async function load() {
+  const p = params().toString();
+  for (const f of ["csv", "xlsx", "pdf"]) $("x-" + f).href = `/api/export/${f}?${p}`;
+  render(await api("/api/businesses?" + p));
+}
+$("refresh").onclick = load;
+$("collect").onclick = async () => {
+  say("collecting...");
+  try { const r = await api("/api/collect", {method: "POST", body: JSON.stringify({query: $("query").value})}); say(`fetched ${r.fetched}, new branches ${r.new_branches}`); load(); }
+  catch (e) { say(e.message); }
+};
+(async () => {
+  STATUSES = await api("/api/statuses");
+  for (const s of STATUSES) $("status").append(new Option(label(s), s));
+  load();
+})();
+</script></body></html>
