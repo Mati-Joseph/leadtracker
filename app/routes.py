@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from flask import (
     Blueprint,
     Response,
@@ -15,6 +17,7 @@ from .grouping import save_places
 from .models import STATUSES, Business, db
 
 bp = Blueprint("api", __name__)
+PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
 
 
 def _filtered():
@@ -32,7 +35,7 @@ def _filtered():
 
 @bp.get("/")
 def index():
-    return send_from_directory(current_app.static_folder, "index.html")
+    return send_from_directory(PUBLIC_DIR, "index.html")
 
 
 @bp.get("/api/statuses")

@@ -71,3 +71,8 @@ def test_collect_without_key(app, client):
         ).status_code
         == 400
     )
+
+
+def test_index_page_served(client):
+    r = client.get("/")
+    assert r.status_code == 200 and b"Lead Tracker" in r.data
