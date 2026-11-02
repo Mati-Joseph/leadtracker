@@ -26,3 +26,4 @@ pytest -q
 - Set a budget alert in Google Cloud before collecting at scale.
 - Lead source is set by `LEAD_SOURCE` in `.env`: `osm` (default, free, no key) or `google` (needs `GOOGLE_API_KEY` and billing).
 - Optional `OVERPASS_URL` overrides the Overpass server.
+# leadtracker
