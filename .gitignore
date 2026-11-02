@@ -7,3 +7,5 @@ instance/
 .pytest_cache/
 .vscode
 ke_schools.json
+.vercel
+.env*
