@@ -27,3 +27,4 @@ pytest -q
 - Lead source is set by `LEAD_SOURCE` in `.env`: `osm` (default, free, no key) or `google` (needs `GOOGLE_API_KEY` and billing).
 - Optional `OVERPASS_URL` overrides the Overpass server.
 # leadtracker
+- Staging branch: pushes create a Vercel preview deployment.
